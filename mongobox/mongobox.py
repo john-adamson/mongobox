@@ -125,7 +125,7 @@ class MongoBox(object):
 
     def _wait_till_started(self):
         attempts = 0
-        while poll = self.process.poll() is None and attempts < START_CHECK_ATTEMPTS:
+        while self.process.poll() is None and attempts < START_CHECK_ATTEMPTS:
             attempts += 1
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
