@@ -4,8 +4,8 @@ Mongo Box
 Mongo Box helps starting and stopping sandboxed MongoDB instance
 from within a Python process. MongoDB instance is created with a
 temporary directory to store database file and is configured to
-be as lightweight as possible. It will choose a free port on localhost, 
-so it will not interfere with default MongoDB processes. 
+be as lightweight as possible. It will choose a free port on localhost,
+so it will not interfere with default MongoDB processes.
 It is primarily expected to be used in unit tests and for prototyping concepts.
 
 A typical use of a Mongo Box:
@@ -16,13 +16,12 @@ from mongobox import MongoBox
 box = MongoBox()
 box.start()
 
-client = box.client() # pymongo client 
-assert client.alive()
+client = box.client()  # pymongo client
+print(client.server_info())
 
 # do stuff with Mongo
 
 box.stop()
-assert not client.alive()
 ```
 
 Nose 1

@@ -11,22 +11,21 @@ import socket
 
 from .utils import find_executable, get_free_port
 
-MONGOD_BIN = 'mongod'
+IS_WINDOWS = sys.platform.startswith("win")
+MONGOD_BIN = 'mongod.exe' if IS_WINDOWS else 'mongod'
 DEFAULT_ARGS = [
     # don't flood stdout, we're not reading it
     "--quiet",
     # save the port
     "--nohttpinterface",
-    # disable unused.
-    "--nounixsocket",
     # use a smaller default file size
     "--smallfiles",
     # journaling on by default in 2.0 and makes it to slow
     # for tests, can causes failures in jenkins
     "--nojournal",
 ]
-STARTUP_TIME = 0.4
-START_CHECK_ATTEMPTS = 200
+STARTUP_TIME = 0.25
+START_CHECK_ATTEMPTS = 40
 
 
 class MongoBox(object):
@@ -34,12 +33,10 @@ class MongoBox(object):
                  log_path=None, db_path=None, scripting=False,
                  prealloc=False, auth=False):
 
-        if 'Win' in sys.platform:
-            MONGOD_BIN += '.exe'
-            DEFAULT_ARGS.remove("--nounixsocket")
-
         self.mongod_bin = mongod_bin or find_executable(MONGOD_BIN)
-        assert self.mongod_bin, 'Could not find "{}" in system PATH. Make sure you have MongoDB installed.'.format(MONGOD_BIN)
+        assert self.mongod_bin, 'Could not find "{}" in system PATH. Make ' \
+                                'sure you have MongoDB installed.'.format(
+                                MONGOD_BIN)
 
         self.port = port or get_free_port()
         self.log_path = log_path or os.devnull
@@ -50,7 +47,8 @@ class MongoBox(object):
 
         if self.db_path:
             if os.path.exists(self.db_path) and os.path.isfile(self.db_path):
-                raise AssertionError('DB path should be a directory, but it is a file.')
+                raise AssertionError('DB path should be a directory, but it is '
+                                     'a file.')
 
         self.process = None
 
@@ -73,13 +71,16 @@ class MongoBox(object):
 
         args.extend(['--dbpath', self.db_path])
         args.extend(['--port', str(self.port)])
-        args.extend(['--logpath', self.log_path])
+
+        if not IS_WINDOWS:
+            args.extend(['--nounixsocket'])  # Disable unused.
+            args.extend(['--logpath', self.log_path])
 
         if self.auth:
             args.append("--auth")
 
         if not self.scripting:
-            args.append("--noscripting")
+           args.append("--noscripting")
 
         if not self.prealloc:
             args.append("--noprealloc")
@@ -100,10 +101,11 @@ class MongoBox(object):
         # other platforms.
         if sys.platform == 'darwin':
             self.process.kill()
+        elif IS_WINDOWS:
+            self.process.terminate()
         else:
             os.kill(self.process.pid, 9)
         self.process.wait()
-
 
         if self._db_path_is_temporary:
             shutil.rmtree(self.db_path)
@@ -117,13 +119,14 @@ class MongoBox(object):
     def client(self):
         import pymongo
         try:
-            return pymongo.MongoClient(port=self.port) # version >=2.4
+            return pymongo.MongoClient(port=self.port)  # version >=2.4
         except AttributeError:
             return pymongo.Connection(port=self.port)
 
     def _wait_till_started(self):
         attempts = 0
-        while self.process.poll() is None and attempts < START_CHECK_ATTEMPTS:
+        poll = self.process.poll()
+        while poll is None and attempts < START_CHECK_ATTEMPTS:
             attempts += 1
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
@@ -131,7 +134,7 @@ class MongoBox(object):
                     s.connect(('localhost', int(self.port)))
                     return True
                 except (IOError, socket.error):
-                    time.sleep(0.25)
+                   time.sleep(STARTUP_TIME)
             finally:
                 s.close()
 
