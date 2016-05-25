@@ -34,6 +34,10 @@ class MongoBox(object):
                  log_path=None, db_path=None, scripting=False,
                  prealloc=False, auth=False):
 
+        if 'Win' in sys.platform:
+            MONGOD_BIN += '.exe'
+            DEFAULT_ARGS.remove("--nounixsocket")
+
         self.mongod_bin = mongod_bin or find_executable(MONGOD_BIN)
         assert self.mongod_bin, 'Could not find "{}" in system PATH. Make sure you have MongoDB installed.'.format(MONGOD_BIN)
 
